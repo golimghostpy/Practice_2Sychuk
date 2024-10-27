@@ -33,7 +33,11 @@ void IntList::print(string delimiter){ // вывод
         cout << current->data << delimiter;
         current = current->next;
     }
-    cout << endl;
+
+    if (delimiter != "\n")
+    {
+        cout << endl;
+    }
 }
 
 void IntList::clear(){ // очистка
@@ -85,15 +89,17 @@ void StringList::push_back(string data){ // добавление элемент�
     last = newElem;
 }
 
-void StringList::print(string delimiter){ // вывод
-    if (is_empty()) return;
+string StringList::print(string delimiter){ // вывод
+    if (is_empty()) return "";
 
+    string toReturn;
     Node<string>* current = first;
     while(current){
-        cout << current->data << delimiter;
+        toReturn += current->data + delimiter;
         current = current->next;
     }
-    cout << endl;
+    toReturn += "\n";
+    return toReturn;
 }
 
 Node<string>* StringList::find(int index){ // нахождение элемента по индексу
@@ -178,7 +184,7 @@ void StringMatrix::push_down(string text, int colNum){ // добавление �
     currRow->nextRow = newElem;
 }
 
-void StringMatrix::print(){ // вывод
+string StringMatrix::print(){ // вывод
     StringList out;
     for (auto col = firstCol; col != nullptr; col = col->nextCol){
         int currRow = 0;
@@ -193,7 +199,7 @@ void StringMatrix::print(){ // вывод
         }
     }
 
-    out.print("\n");
+    return out.print("\n");
 }
 
 void StringMatrix::clear(){ // очистка

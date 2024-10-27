@@ -51,7 +51,7 @@ struct StringList{ // список строк
 
     bool is_empty();
     void push_back(string);
-    void print(string);
+    string print(string);
     Node<string>* find(int);
     Node<string>* word_find(const string&);
     string join(const char);
@@ -76,7 +76,7 @@ struct StringMatrix{ // матрица, заполняемая по стобца
     bool is_empty();
     void push_right(string);
     void push_down(string, int);
-    void print();
+    string print();
     void clear();
 };
 

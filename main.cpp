@@ -24,13 +24,13 @@ string create_db();
 StringList split(const string&, const string&);
 string remove_extra(string&);
 void write_in_csv(const string&, StringList);
-void insert_into(const string&, StringList);
+string insert_into(const string&, StringList);
 bool check_filter_delete(StringList&, StringList&, const string&);
 string low_id(const string&, int);
-void delete_from(const string&, StringList);
+string delete_from(const string&, StringList);
 bool check_filter_select(const string&, const string&, int);
 IntList cnt_rows(StringMatrix&);
-void select_from(const string&, StringList);
+string select_from(const string&, StringList);
 SQLRequest get_com (const string&);
 int main();
 
@@ -45,7 +45,6 @@ StringList take_section(StringList& source, unsigned int frontInd, unsigned int 
 }
 
 void check_active(const string& genPath, const StringList& tables){ // проверка, используется ли сейчас таблица
-    cout << "Now all tables will be checking until they all are free" << endl;
     while (true){
         bool isFree = true;
         for (auto i = tables.first; i != nullptr; i = i->next){
@@ -61,7 +60,6 @@ void check_active(const string& genPath, const StringList& tables){ // пров�
 
         if (isFree) {break;}
     }
-    cout << "Now your reques will be completed" << endl;
 }
 
 void make_active(const string& genPath, const StringList& tables){ // занять таблицу
@@ -172,7 +170,7 @@ void write_in_csv(const string& path, StringList text){ // запись в csv �
     }
 }
 
-void insert_into(const string& schemaName, StringList command){ // вставка строки в бд
+string insert_into(const string& schemaName, StringList command){ // вставка строки в бд
     string table = command.find(2)->data; // получаем название таблицы
 
     StringList tables;
@@ -199,11 +197,10 @@ void insert_into(const string& schemaName, StringList command){ // вставк�
     }
 
     if (split(header, ";").listSize != data.listSize){
-        cout << "Wrong count of arguments" << endl;
         make_inactive(schemaName + "/", tables);
         tables.clear();
         data.clear();
-        return;
+        return "Wrong count of arguments";
     }
 
     ofstream pkWrite(schemaName + '/' + table + '/' + table + "_pk_sequence.txt");
@@ -243,6 +240,7 @@ void insert_into(const string& schemaName, StringList command){ // вставк�
     make_inactive(schemaName + "/", tables);
     tables.clear();
     data.clear();
+    return "Inserted successfully";
 }
 
 bool check_filter_delete(StringList& header, StringList& text, const string& filter){ // проверка фильтра для удаления
@@ -286,7 +284,12 @@ string low_id(const string& command, int lowOn){ // уменьшить id пос
     return newCommand;
 }
 
-void delete_from(const string& schemaName, StringList command){ // основная функция удаление
+string delete_from(const string& schemaName, StringList command){ // основная функция удаление
+    if (command.listSize < 3)
+    {
+        return "Wrong count of arguments";
+    }
+
     StringList tables; // получение таблиц
     tables.push_back(command.find(2)->data);
     check_active(schemaName + "/", tables);
@@ -318,7 +321,7 @@ void delete_from(const string& schemaName, StringList command){ // основн�
         updateId.close();
         tables.clear();
         columns.clear();
-        return;
+        return "Deleted successfully";
     }
 
     StringList filter = take_section(command, 4, command.listSize); // получение фильтра
@@ -369,6 +372,7 @@ void delete_from(const string& schemaName, StringList command){ // основн�
     make_inactive(schemaName + "/", tables);
     tables.clear();
     filter.clear();
+    return "Deleted successfully";
 }
 
  // проверка условия для select
@@ -471,7 +475,7 @@ IntList cnt_rows(StringMatrix& matrix){ // подсчет количества �
     return eachCol;
 }
 
-void select_from(const string& schemaName, StringList command){ // функция получения выборки
+string select_from(const string& schemaName, StringList command){ // функция получения выборки
     string genPath = schemaName + '/';
 
     int whereIndex = command.index_word("WHERE");
@@ -587,25 +591,27 @@ void select_from(const string& schemaName, StringList command){ // функци�
 
           // проверка наличия каких-то данных в полученной матрице
         IntList eachCol = cnt_rows(toOut);
-        for (auto i = eachCol.first; i != nullptr; i = i->next){
+        for (auto i = eachCol.first; i != nullptr; i = i->next)
+        {
             if (i->data == 0){
-                cout << string("-") * 40 << endl;
+                string toReturn;
+                toReturn += string("-") * 40 + "\n";
                 for (auto j = toOut.firstCol; j != nullptr; j = j->nextCol){
-                    cout << j->data << " ";
+                    toReturn += j->data + " ";
                 }
-                cout << endl << string("-") * 40 << endl;
-                return;
+                toReturn += "\n" + string("-") * 40 + "\n";
+                return toReturn;
             }
         }
 
-        toOut.print();
+        string toReturn = toOut.print();
         make_inactive(genPath, tables);
         tables.clear();
         columns.clear();
         strInTable.clear();
         toOut.clear();
         eachCol.clear();
-        return;
+        return toReturn;
     }
      // получение фильтра
     string filter = take_section(command, command.index_word("WHERE") + 1, command.listSize).join(' ');
@@ -653,12 +659,13 @@ void select_from(const string& schemaName, StringList command){ // функци�
     IntList cntInEach = cnt_rows(toOut);
     for (auto i = cntInEach.first; i != nullptr; i = i->next){
         if (i->data == 0){
-            cout << string("-") * 40 << endl;
+            string toReturn;
+            toReturn += string("-") * 40 + "\n";
             for (auto j = toOut.firstCol; j != nullptr; j = j->nextCol){
-                cout << j->data << " ";
+                toReturn += j->data + " ";
             }
-            cout << endl << string("-") * 40 << endl;
-            return;
+            toReturn += "\n" + string("-") * 40 + "\n";
+            return toReturn;
         }
     }
 
@@ -697,25 +704,32 @@ void select_from(const string& schemaName, StringList command){ // функци�
     }
 
 
-    finalOut.print();
+    string toReturn = finalOut.print();
     temp.clear();
     finalOut.clear();
     cntInEach.clear();
     make_inactive(genPath, tables);
     tables.clear();
     columns.clear();
+    return toReturn;
 }
 
 SQLRequest get_com (const string& command){ // выбор токена
     if (command == "SELECT") {return SQLRequest::SELECT;}
     if (command == "INSERT") {return SQLRequest::INSERT;}
     if (command == "DELETE") {return SQLRequest::DELETE;}
-    if (command == "end") {return SQLRequest::END;}
     return SQLRequest::UNKNOWN;
 }
 
 string comp_request(const string& schemaName, string request){
-
+    StringList splited = split(request, " ");
+    SQLRequest choice = get_com(splited.find(0)->data);
+    switch (choice){
+    case SQLRequest::SELECT: return select_from(schemaName, splited);
+    case SQLRequest::INSERT: return insert_into(schemaName, splited);
+    case SQLRequest::DELETE: return delete_from(schemaName, splited);
+    case SQLRequest::UNKNOWN: return "Wrong command!";
+    }
 }
 
 void serve_client(int servSocket, const string& schemaName){
@@ -737,16 +751,16 @@ void serve_client(int servSocket, const string& schemaName){
             cout << "Request taken: " << client.get() << endl;
         }
 
-        string answer = "Server message: ";
+        string answer = "Server message:\n";
         string request = client.get();
         string partRes = comp_request(schemaName, request);
         answer += partRes;
 
         send(servSocket, answer.c_str(), answer.size(), 0);
-
     }
+
     close(servSocket);
-    cntThreads--;
+    --cntThreads;
 }
 
 void start_server(const string& schemaName) {
@@ -791,8 +805,8 @@ void start_server(const string& schemaName) {
         }
 
         if(cntThreads <= MAX_CLIENTS){
-            char* b = inet_ntoa(clientAddress.sin_addr);
-            cout << "Client[" << b << "] was connected" << endl;
+            char* clientIP = inet_ntoa(clientAddress.sin_addr);
+            cout << "Client[" << clientIP << "] was connected" << endl;
             thread(serve_client, clientSocket, schemaName).detach();
 
             string answer = "Successfully connected to the server";
@@ -811,23 +825,6 @@ void start_server(const string& schemaName) {
 int main()
 {
     string schemaName = create_db();
-
     start_server(schemaName);
-
-    string command;
-    while(true){
-        getline(cin, command);
-        StringList splited = split(command, " ");
-        SQLRequest choice = get_com(splited.find(0)->data);
-        switch (choice){
-            case SQLRequest::SELECT: select_from(schemaName, splited); break;
-            case SQLRequest::INSERT: insert_into(schemaName, splited); break;
-            case SQLRequest::DELETE: delete_from(schemaName, splited); break;
-            case SQLRequest::END: goto finish;
-            case SQLRequest::UNKNOWN: cout << "Wrong command!" << endl; break;
-        }
-    }
-    finish:
-
     return 0;
 }

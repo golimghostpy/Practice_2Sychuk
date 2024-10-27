@@ -10,6 +10,24 @@
 
 using namespace std;
 
+struct Array {
+    char* data;
+    int size;
+    int capacity;
+
+    Array(int initialCapacity = 10) : size(0), capacity(initialCapacity){
+        data = new char[capacity];
+    }
+
+    ~Array() {
+        delete[] data;
+    }
+
+    char* get(){
+        return data;
+    }
+};
+
 int main() {
     int sock = 0;
     struct sockaddr_in serv_addr;
@@ -32,11 +50,41 @@ int main() {
         return -1;
     }
 
-
     char buffer[1024];
-    int valread = read(sock, buffer, 1024);
+    int connectResp = read(sock, buffer, 1024);
     cout << "Server message: " << buffer << endl;
 
+    while (true)
+    {
+        string request;
+        cout << "Enter request: ";
+        getline(cin, request);
+
+        if (request == "end")
+        {
+            break;
+        }
+
+        send(sock, request.c_str(), request.size(), 0);
+        Array response(1024);
+        memset(response.data, 0, response.size);
+
+        ssize_t byteResp = recv(sock, response.get(), response.size - 1, 0);
+        if (byteResp > 0)
+        {
+            response.get()[byteResp] = '\0';
+            cout << response.get();
+        }
+        else
+        {
+            cout << "Getting packages error" << endl;
+            close(sock);
+            cout << "You have been forcibly disconnected" << endl;
+            return 0;
+        }
+    }
+// INSERT INTO food VALUES ('beef', '1000')
     close(sock);
+    cout << "You were successfully disconnected";
     return 0;
 }
