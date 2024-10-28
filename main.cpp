@@ -14,7 +14,6 @@
 int tuplesLim;
 mutex mainMuter;
 atomic<int> cntThreads(1);
-const int MAX_CLIENTS = 50;
 
 StringList take_section(StringList&, unsigned int, unsigned int);
 void check_active(const string&, const StringList&);
@@ -32,8 +31,8 @@ bool check_filter_select(const string&, const string&, int);
 IntList cnt_rows(StringMatrix&);
 string select_from(const string&, StringList);
 SQLRequest get_com (const string&);
-string comp_request(const string&, string);
-void serve_client(int, const string&);
+string complete_request(const string&, string);
+void serve_client(int, const string&, const char*);
 void start_server(const string&);
 int main();
 
@@ -724,7 +723,7 @@ SQLRequest get_com (const string& command){ // выбор токена
     return SQLRequest::UNKNOWN;
 }
 
-string comp_request(const string& schemaName, string request){
+string complete_request(const string& schemaName, string request){
     StringList splited = split(request, " "); // делим запрос
     SQLRequest choice = get_com(splited.find(0)->data); // полчаем токен
     switch (choice){ // в зависимости от токена вызываем нужную функцию
@@ -735,16 +734,16 @@ string comp_request(const string& schemaName, string request){
     }
 }
 
-void serve_client(int servSocket, const string& schemaName){
+void serve_client(int clientSocket, const string& schemaName, const char* clientIP){
     ++cntThreads; // увеличиваем количество клиентов на сервере
 
     while (true) { // начинаем слушать запросы
         Array client(1024);
         memset(client.get(), 0, client.size); // очищаем буфер
 
-        ssize_t bytesRead = recv(servSocket, client.get(), client.size - 1, 0); // получаем запрос
-        if (bytesRead <= 0) { // либо клиент отключился, либо произошла ошибкаа при передаче данных
-            cout << "Error or client was disconnected" << endl;
+        ssize_t bytesRead = recv(clientSocket, client.get(), client.size - 1, 0); // получаем запрос
+        if (bytesRead <= 0) { // либо клиент отключился, либо произошла ошибка при передаче данных
+            cout << "Client [" << clientIP << "] was disconnected" << endl;
             break;
         }
 
@@ -756,22 +755,18 @@ void serve_client(int servSocket, const string& schemaName){
 
         string answer = "Server message:\n";
         string request = client.get();
-        string partRes = comp_request(schemaName, request); // отправляем запрос на выполнение
+        string partRes = complete_request(schemaName, request); // отправляем запрос на выполнение
         answer += partRes; // формируем ответ
 
-        send(servSocket, answer.c_str(), answer.size(), 0); // отправляем ответ
+        send(clientSocket, answer.c_str(), answer.size(), 0); // отправляем ответ
     }
 
-    close(servSocket); // закрываем сокет для клиента
+    close(clientSocket); // закрываем сокет для клиента
     --cntThreads; // уменьшаем количество клиентов
 }
 
 void start_server(const string& schemaName) {
     int serverSocket;
-    struct sockaddr_in address;
-    int opt = 1;
-    int addrlen = sizeof(address);
-    char buffer[1024] = {0};
 
     // создание сокета
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -780,14 +775,16 @@ void start_server(const string& schemaName) {
     }
 
     // настройка параметров сокета
+    int opt = 1;
     if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         cerr << "Error of setting parameters of socket" << endl;
         return;
     }
 
+    struct sockaddr_in address;
     address.sin_family = AF_INET; // IPv4
     address.sin_addr.s_addr = inet_addr("127.0.0.1"); // установка IP
-    address.sin_port = htons(PORT); // уановка порта
+    address.sin_port = htons(PORT); // установка порта
 
     // привязкаа сокета к адресу
     if (bind(serverSocket, (struct sockaddr *)&address, sizeof(address)) < 0) {
@@ -812,10 +809,10 @@ void start_server(const string& schemaName) {
             continue;
         }
 
-        if(cntThreads <= MAX_CLIENTS){ // если на сервере есть место
+        if(cntThreads <= 50){ // если на сервере есть место
             char* clientIP = inet_ntoa(clientAddress.sin_addr); // получаем IP клиента
             cout << "Client[" << clientIP << "] was connected" << endl; // выводим клиента, который подключился
-            thread(serve_client, clientSocket, schemaName).detach(); // выводим клиента в другой поток
+            thread(serve_client, clientSocket, schemaName, clientIP).detach(); // выводим клиента в другой поток
             // и отключаем отслеживание
 
             string answer = "Successfully connected to the server";
