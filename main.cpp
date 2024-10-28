@@ -32,6 +32,9 @@ bool check_filter_select(const string&, const string&, int);
 IntList cnt_rows(StringMatrix&);
 string select_from(const string&, StringList);
 SQLRequest get_com (const string&);
+string comp_request(const string&, string);
+void serve_client(int, const string&);
+void start_server(const string&);
 int main();
 
 StringList take_section(StringList& source, unsigned int frontInd, unsigned int backInd){ // взятие части списка
@@ -200,7 +203,7 @@ string insert_into(const string& schemaName, StringList command){ // встав�
         make_inactive(schemaName + "/", tables);
         tables.clear();
         data.clear();
-        return "Wrong count of arguments";
+        return "Wrong count of arguments\n";
     }
 
     ofstream pkWrite(schemaName + '/' + table + '/' + table + "_pk_sequence.txt");
@@ -240,7 +243,7 @@ string insert_into(const string& schemaName, StringList command){ // встав�
     make_inactive(schemaName + "/", tables);
     tables.clear();
     data.clear();
-    return "Inserted successfully";
+    return "Inserted successfully\n";
 }
 
 bool check_filter_delete(StringList& header, StringList& text, const string& filter){ // проверка фильтра для удаления
@@ -287,7 +290,7 @@ string low_id(const string& command, int lowOn){ // уменьшить id пос
 string delete_from(const string& schemaName, StringList command){ // основная функция удаление
     if (command.listSize < 3)
     {
-        return "Wrong count of arguments";
+        return "Wrong count of arguments\n";
     }
 
     StringList tables; // получение таблиц
@@ -321,7 +324,7 @@ string delete_from(const string& schemaName, StringList command){ // основ�
         updateId.close();
         tables.clear();
         columns.clear();
-        return "Deleted successfully";
+        return "Deleted successfully\n";
     }
 
     StringList filter = take_section(command, 4, command.listSize); // получение фильтра
@@ -372,7 +375,7 @@ string delete_from(const string& schemaName, StringList command){ // основ�
     make_inactive(schemaName + "/", tables);
     tables.clear();
     filter.clear();
-    return "Deleted successfully";
+    return "Deleted successfully\n";
 }
 
  // проверка условия для select
@@ -722,9 +725,9 @@ SQLRequest get_com (const string& command){ // выбор токена
 }
 
 string comp_request(const string& schemaName, string request){
-    StringList splited = split(request, " ");
-    SQLRequest choice = get_com(splited.find(0)->data);
-    switch (choice){
+    StringList splited = split(request, " "); // делим запрос
+    SQLRequest choice = get_com(splited.find(0)->data); // полчаем токен
+    switch (choice){ // в зависимости от токена вызываем нужную функцию
     case SQLRequest::SELECT: return select_from(schemaName, splited);
     case SQLRequest::INSERT: return insert_into(schemaName, splited);
     case SQLRequest::DELETE: return delete_from(schemaName, splited);
@@ -733,34 +736,34 @@ string comp_request(const string& schemaName, string request){
 }
 
 void serve_client(int servSocket, const string& schemaName){
-    ++cntThreads;
+    ++cntThreads; // увеличиваем количество клиентов на сервере
 
-    while (true) {
+    while (true) { // начинаем слушать запросы
         Array client(1024);
-        memset(client.get(), 0, client.size);
+        memset(client.get(), 0, client.size); // очищаем буфер
 
-        ssize_t bytesRead = recv(servSocket, client.get(), client.size - 1, 0);
-        if (bytesRead <= 0) {
+        ssize_t bytesRead = recv(servSocket, client.get(), client.size - 1, 0); // получаем запрос
+        if (bytesRead <= 0) { // либо клиент отключился, либо произошла ошибкаа при передаче данных
             cout << "Error or client was disconnected" << endl;
             break;
         }
 
         {
-            lock_guard<mutex> lock(mainMuter);
+            lock_guard<mutex> lock(mainMuter); // ограничиваем доступ, чтобы не было ошибок в выводе
             client.get()[bytesRead] = '\0';
             cout << "Request taken: " << client.get() << endl;
         }
 
         string answer = "Server message:\n";
         string request = client.get();
-        string partRes = comp_request(schemaName, request);
-        answer += partRes;
+        string partRes = comp_request(schemaName, request); // отправляем запрос на выполнение
+        answer += partRes; // формируем ответ
 
-        send(servSocket, answer.c_str(), answer.size(), 0);
+        send(servSocket, answer.c_str(), answer.size(), 0); // отправляем ответ
     }
 
-    close(servSocket);
-    --cntThreads;
+    close(servSocket); // закрываем сокет для клиента
+    --cntThreads; // уменьшаем количество клиентов
 }
 
 void start_server(const string& schemaName) {
@@ -770,24 +773,29 @@ void start_server(const string& schemaName) {
     int addrlen = sizeof(address);
     char buffer[1024] = {0};
 
+    // создание сокета
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         cerr << "Error of create socket" << endl;
         return;
     }
 
-    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+    // настройка параметров сокета
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         cerr << "Error of setting parameters of socket" << endl;
         return;
     }
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr("127.0.0.1");
-    address.sin_port = htons(PORT);
 
+    address.sin_family = AF_INET; // IPv4
+    address.sin_addr.s_addr = inet_addr("127.0.0.1"); // установка IP
+    address.sin_port = htons(PORT); // уановка порта
+
+    // привязкаа сокета к адресу
     if (bind(serverSocket, (struct sockaddr *)&address, sizeof(address)) < 0) {
         cerr << "Error of binding" << endl;
         return;
     }
 
+    // прослушивание подключений
     if (listen(serverSocket, 1) < 0) {
         cerr << "Error of socket listening" << endl;
         return;
@@ -795,22 +803,23 @@ void start_server(const string& schemaName) {
 
     cout << "Server started" << endl;
 
-    while (true){
+    while (true){ // начинаем прослушивание
         sockaddr_in clientAddress;
         socklen_t clientSize = sizeof(clientAddress);
-        int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddress, &clientSize);
+        int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddress, &clientSize); // принимаем подключение клиента
         if(clientSocket < 0){
             cout << "Error to connect client" << endl;
             continue;
         }
 
-        if(cntThreads <= MAX_CLIENTS){
-            char* clientIP = inet_ntoa(clientAddress.sin_addr);
-            cout << "Client[" << clientIP << "] was connected" << endl;
-            thread(serve_client, clientSocket, schemaName).detach();
+        if(cntThreads <= MAX_CLIENTS){ // если на сервере есть место
+            char* clientIP = inet_ntoa(clientAddress.sin_addr); // получаем IP клиента
+            cout << "Client[" << clientIP << "] was connected" << endl; // выводим клиента, который подключился
+            thread(serve_client, clientSocket, schemaName).detach(); // выводим клиента в другой поток
+            // и отключаем отслеживание
 
             string answer = "Successfully connected to the server";
-            send(clientSocket, answer.c_str(), answer.size(), 0);
+            send(clientSocket, answer.c_str(), answer.size(), 0); // отправляем клиенту успешное подключение
         }
         else{
             string answer = "A lot of clients now, try it later";
@@ -819,12 +828,12 @@ void start_server(const string& schemaName) {
         }
     }
 
-    close(serverSocket);
+    close(serverSocket); // закрываем сервер
 }
 
 int main()
 {
-    string schemaName = create_db();
-    start_server(schemaName);
+    string schemaName = create_db(); // создаем бд из json, если ее не было
+    start_server(schemaName); // запускаем сервер
     return 0;
 }

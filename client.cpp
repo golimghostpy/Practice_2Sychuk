@@ -37,21 +37,24 @@ int main() {
         return -1;
     }
 
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
+    // настройка адреса сервера
+    serv_addr.sin_family = AF_INET; // IPv4
+    serv_addr.sin_port = htons(PORT); // установка порта
 
+    // преобразование ip в бинарный формат
     if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
         cerr << "Incorrect address" << endl;
         return -1;
     }
 
+    // подключение к серверу
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         cerr << "Connection error" << endl;
         return -1;
     }
 
-    char buffer[1024];
-    int connectResp = read(sock, buffer, 1024);
+    char buffer[1024]; // буфер для получаемого сообзения
+    int connectResp = read(sock, buffer, 1024); // ACK на подключение
     cout << "Server message: " << buffer << endl;
 
     while (true)
@@ -65,17 +68,17 @@ int main() {
             break;
         }
 
-        send(sock, request.c_str(), request.size(), 0);
+        send(sock, request.c_str(), request.size(), 0); // отправляем запрос на сервер
         Array response(1024);
-        memset(response.data, 0, response.size);
+        memset(response.data, 0, response.size); // очищаем область памяти массива
 
-        ssize_t byteResp = recv(sock, response.get(), response.size - 1, 0);
+        ssize_t byteResp = recv(sock, response.get(), response.size - 1, 0); // получение ответа
         if (byteResp > 0)
         {
             response.get()[byteResp] = '\0';
             cout << response.get();
         }
-        else
+        else // в случае, если возникла ошибка заккрываем сокет
         {
             cout << "Getting packages error" << endl;
             close(sock);
@@ -83,8 +86,8 @@ int main() {
             return 0;
         }
     }
-// INSERT INTO food VALUES ('beef', '1000')
+
     close(sock);
-    cout << "You were successfully disconnected";
+    cout << "You were successfully disconnected"; // отключаемся от сервера
     return 0;
 }
